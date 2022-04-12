@@ -79,25 +79,11 @@ func (d *state) clone() *state {
 	return &ret
 }
 
-var uintPool = &sync.Pool{
-	New: func() interface{} {
-		i := [25]uint64{}
-		return i
-	},
-}
-
-var storagePool = &sync.Pool{
-	New: func() interface{} {
-		s := storageBuf{}
-		return s
-	},
-}
-
 var statePool = &sync.Pool{
 	New: func() interface{} {
 		s := state{
-			a:       uintPool.Get().([25]uint64),
-			storage: storagePool.Get().(storageBuf),
+			a:       [25]uint64{},
+			storage: storageBuf{},
 		}
 		return s
 	},
@@ -245,8 +231,6 @@ func (d *state) Sum(in []byte) []byte {
 	hash := make([]byte, dup.outputLen)
 	dup.Read(hash)
 
-	uintPool.Put(dup.a)
-	storagePool.Put(dup.storage)
 	statePool.Put(*dup)
 
 	return append(in, hash...)
