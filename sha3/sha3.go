@@ -4,6 +4,10 @@
 
 package sha3
 
+import (
+	"sync"
+)
+
 // spongeDirection indicates the direction bytes are flowing through the sponge.
 type spongeDirection int
 
@@ -73,6 +77,39 @@ func (d *state) clone() *state {
 	}
 
 	return &ret
+}
+
+var statePool = sync.Pool{
+	New: func() interface{} {
+		return new(state)
+	},
+}
+
+func (d *state) cloneWithSyncPool() *state {
+	ret := statePool.Get().(*state)
+
+	ret.rate = d.rate
+	ret.outputLen = d.outputLen
+	ret.dsbyte = d.dsbyte
+	ret.outputLen = d.outputLen
+	ret.state = d.state
+	ret.buf = d.buf
+
+	for i, v := range d.a {
+		ret.a[i] = v
+	}
+
+	for i, v := range d.storage {
+		ret.storage[i] = v
+	}
+
+	if ret.state == spongeAbsorbing {
+		ret.buf = ret.storage.asBytes()[:len(ret.buf)]
+	} else {
+		ret.buf = ret.storage.asBytes()[d.rate-cap(d.buf) : d.rate]
+	}
+
+	return ret
 }
 
 // permute applies the KeccakF-1600 permutation. It handles
@@ -186,8 +223,11 @@ func (d *state) Read(out []byte) (n int, err error) {
 func (d *state) Sum(in []byte) []byte {
 	// Make a copy of the original hash so that caller can keep writing
 	// and summing.
-	dup := d.clone()
+	dup := d.cloneWithSyncPool()
 	hash := make([]byte, dup.outputLen)
 	dup.Read(hash)
+
+	statePool.Put(dup)
+
 	return append(in, hash...)
 }
