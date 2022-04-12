@@ -79,18 +79,14 @@ func (d *state) clone() *state {
 	return &ret
 }
 
-var statePool = &sync.Pool{
+var statePool = sync.Pool{
 	New: func() interface{} {
-		s := state{
-			a:       [25]uint64{},
-			storage: storageBuf{},
-		}
-		return s
+		return new(state)
 	},
 }
 
 func (d *state) cloneWithSyncPool() *state {
-	ret := statePool.Get().(state)
+	ret := statePool.Get().(*state)
 
 	ret.rate = d.rate
 	ret.outputLen = d.outputLen
@@ -113,7 +109,7 @@ func (d *state) cloneWithSyncPool() *state {
 		ret.buf = ret.storage.asBytes()[d.rate-cap(d.buf) : d.rate]
 	}
 
-	return &ret
+	return ret
 }
 
 // permute applies the KeccakF-1600 permutation. It handles
@@ -231,7 +227,7 @@ func (d *state) Sum(in []byte) []byte {
 	hash := make([]byte, dup.outputLen)
 	dup.Read(hash)
 
-	statePool.Put(*dup)
+	statePool.Put(dup)
 
 	return append(in, hash...)
 }
